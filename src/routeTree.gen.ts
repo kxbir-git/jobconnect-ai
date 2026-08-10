@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as SavedRouteImport } from './routes/saved'
 import { Route as JobsJobIdRouteImport } from './routes/jobs.$jobId'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SavedRoute = SavedRouteImport.update({
@@ -38,12 +44,14 @@ const JobsJobIdRoute = JobsJobIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/profile': typeof ProfileRoute
   '/saved': typeof SavedRoute
   '/jobs/$jobId': typeof JobsJobIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/saved' | '/jobs/$jobId'
+  fullPaths: '/' | '/auth' | '/profile' | '/saved' | '/jobs/$jobId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/saved' | '/jobs/$jobId'
-  id: '__root__' | '/' | '/auth' | '/saved' | '/jobs/$jobId'
+  to: '/' | '/auth' | '/profile' | '/saved' | '/jobs/$jobId'
+  id: '__root__' | '/' | '/auth' | '/profile' | '/saved' | '/jobs/$jobId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  ProfileRoute: typeof ProfileRoute
   SavedRoute: typeof SavedRoute
   JobsJobIdRoute: typeof JobsJobIdRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/saved': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  ProfileRoute: ProfileRoute,
   SavedRoute: SavedRoute,
   JobsJobIdRoute: JobsJobIdRoute,
 }
