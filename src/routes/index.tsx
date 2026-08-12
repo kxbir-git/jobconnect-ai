@@ -3,8 +3,9 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { JobCard } from "@/components/job-card";
-import { useStore } from "@/lib/store";
+import { useJobs } from "@/lib/queries";
 
 const FILTERS = ["All", "Full-time", "Part-time", "Contract", "Internship"] as const;
 
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { jobs } = useStore();
+  const { data: jobs = [], isLoading, isError } = useJobs();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
 
@@ -92,13 +93,25 @@ function Index() {
           </span>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {results.map((job) => (
-            <JobCard key={job.id} job={job} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {[0, 1, 2, 3].map((index) => (
+              <Skeleton key={index} className="h-44 rounded-xl" />
+            ))}
+          </div>
+        ) : isError ? (
+          <p className="py-16 text-center text-muted-foreground">
+            We couldn&apos;t load jobs right now. Please refresh and try again.
+          </p>
+        ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            {results.map((job) => (
+              <JobCard key={job.id} job={job} />
+            ))}
+          </div>
+        )}
 
-        {results.length === 0 && (
+        {!isLoading && !isError && results.length === 0 && (
           <p className="py-16 text-center text-muted-foreground">
             No jobs match that search yet — try a different keyword.
           </p>
