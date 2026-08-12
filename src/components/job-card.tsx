@@ -4,12 +4,15 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Job } from "@/lib/mock-data";
+import type { Job } from "@/lib/api";
+import { useSavedJobIds, useToggleSaved } from "@/lib/queries";
 import { useStore } from "@/lib/store";
 
 export function JobCard({ job }: { job: Job }) {
-  const { saved, user, toggleSaved } = useStore();
-  const isSaved = saved.includes(job.id);
+  const { userId } = useStore();
+  const { data: savedIds = [] } = useSavedJobIds();
+  const toggleSaved = useToggleSaved();
+  const isSaved = savedIds.includes(job.id);
 
   return (
     <Card className="group border-border/70 bg-card/70 transition-colors hover:border-primary/60">
@@ -28,14 +31,21 @@ export function JobCard({ job }: { job: Job }) {
           <Button
             variant="ghost"
             size="icon"
+            disabled={toggleSaved.isPending}
             aria-label={isSaved ? "Remove from saved" : "Save job"}
             onClick={() => {
-              if (!user) {
+              if (!userId) {
                 toast.error("Sign in to save jobs");
                 return;
               }
-              const nowSaved = toggleSaved(job.id);
-              toast.success(nowSaved ? "Saved for later" : "Removed from saved");
+              toggleSaved.mutate(
+                { jobId: job.id, isSaved },
+                {
+                  onSuccess: (nowSaved) =>
+                    toast.success(nowSaved ? "Saved for later" : "Removed from saved"),
+                  onError: () => toast.error("Could not update saved jobs"),
+                },
+              );
             }}
           >
             {isSaved ? (
