@@ -14,7 +14,163 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      companies: {
+        Row: {
+          about: string
+          created_at: string
+          created_by: string | null
+          id: string
+          location: string
+          name: string
+          updated_at: string
+          website: string
+        }
+        Insert: {
+          about?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location?: string
+          name: string
+          updated_at?: string
+          website?: string
+        }
+        Update: {
+          about?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location?: string
+          name?: string
+          updated_at?: string
+          website?: string
+        }
+        Relationships: []
+      }
+      jobs: {
+        Row: {
+          company_id: string | null
+          company_name: string
+          created_at: string
+          created_by: string | null
+          description: string
+          experience: string
+          id: string
+          job_type: string
+          location: string
+          requirements: string[]
+          salary: string
+          tags: string[]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          company_name?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          experience?: string
+          id?: string
+          job_type?: string
+          location?: string
+          requirements?: string[]
+          salary?: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          company_name?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          experience?: string
+          id?: string
+          job_type?: string
+          location?: string
+          requirements?: string[]
+          salary?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          bio: string
+          created_at: string
+          email: string
+          id: string
+          name: string
+          resume_url: string
+          role: string
+          skills: string[]
+          updated_at: string
+        }
+        Insert: {
+          bio?: string
+          created_at?: string
+          email?: string
+          id: string
+          name?: string
+          resume_url?: string
+          role?: string
+          skills?: string[]
+          updated_at?: string
+        }
+        Update: {
+          bio?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          resume_url?: string
+          role?: string
+          skills?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      saved_jobs: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_jobs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
