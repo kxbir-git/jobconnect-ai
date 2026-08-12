@@ -7,18 +7,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  applicants as seedApplicants,
-  companies as seedCompanies,
-  jobs as seedJobs,
-  type Applicant,
-  type Company,
-  type Job,
-} from "./mock-data";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { applicants as seedApplicants, type Applicant } from "./mock-data";
 
 export type Role = "student" | "recruiter";
 
-export type User = {
+export type Profile = {
+  id: string;
   name: string;
   email: string;
   role: Role;
@@ -27,49 +23,38 @@ export type User = {
   resumeUrl: string;
 };
 
-type State = {
-  user: User | null;
-  saved: string[];
-  applied: string[];
-  jobs: Job[];
-  companies: Company[];
-  applicants: Applicant[];
-};
+const LOCAL_KEY = "jobhunt-local-v2";
 
-const STORAGE_KEY = "jobhunt-state-v1";
+type LocalState = { applied: string[]; applicants: Applicant[] };
 
-const initialState: State = {
-  user: null,
-  saved: [],
-  applied: [],
-  jobs: seedJobs,
-  companies: seedCompanies,
-  applicants: seedApplicants,
-};
+const initialLocal: LocalState = { applied: [], applicants: seedApplicants };
 
-type StoreValue = State & {
+type StoreValue = {
+  session: Session | null;
+  userId: string | null;
+  user: Profile | null;
   hydrated: boolean;
-  login: (user: User) => void;
-  logout: () => void;
-  updateProfile: (patch: Partial<User>) => void;
-  toggleSaved: (jobId: string) => boolean;
+  applied: string[];
+  applicants: Applicant[];
+  refreshProfile: () => Promise<void>;
+  updateProfile: (patch: Partial<Profile>) => Promise<void>;
   applyToJob: (jobId: string) => void;
-  addCompany: (company: Omit<Company, "id">) => void;
-  addJob: (job: Omit<Job, "id" | "postedAt">) => void;
-  updateJob: (jobId: string, patch: Partial<Job>) => void;
   setApplicantStatus: (applicantId: string, status: Applicant["status"]) => void;
+  logout: () => Promise<void>;
 };
 
 const StoreContext = createContext<StoreValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<State>(initialState);
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
+  const [local, setLocal] = useState<LocalState>(initialLocal);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setState({ ...initialState, ...(JSON.parse(raw) as Partial<State>) });
+      const raw = window.localStorage.getItem(LOCAL_KEY);
+      if (raw) setLocal({ ...initialLocal, ...(JSON.parse(raw) as Partial<LocalState>) });
     } catch {
       /* ignore corrupt storage */
     }
@@ -78,89 +63,110 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state, hydrated]);
+    window.localStorage.setItem(LOCAL_KEY, JSON.stringify(local));
+  }, [local, hydrated]);
 
-  const login = useCallback((user: User) => setState((s) => ({ ...s, user })), []);
-  const logout = useCallback(() => setState((s) => ({ ...s, user: null })), []);
+  const loadProfile = useCallback(async (userId: string) => {
+    const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+    if (!data) {
+      setUser(null);
+      return;
+    }
+    setUser({
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      role: (data.role as Role) ?? "student",
+      bio: data.bio ?? "",
+      skills: data.skills ?? [],
+      resumeUrl: data.resume_url ?? "",
+    });
+  }, []);
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      if (nextSession?.user) {
+        void loadProfile(nextSession.user.id);
+      } else {
+        setUser(null);
+      }
+    });
+
+    void supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session?.user) void loadProfile(data.session.user.id);
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, [loadProfile]);
+
+  const userId = session?.user?.id ?? null;
+
+  const refreshProfile = useCallback(async () => {
+    if (userId) await loadProfile(userId);
+  }, [userId, loadProfile]);
+
   const updateProfile = useCallback(
-    (patch: Partial<User>) =>
-      setState((s) => (s.user ? { ...s, user: { ...s.user, ...patch } } : s)),
+    async (patch: Partial<Profile>) => {
+      if (!userId) return;
+      const payload: Record<string, unknown> = {};
+      if (patch.name !== undefined) payload["name"] = patch.name;
+      if (patch.role !== undefined) payload["role"] = patch.role;
+      if (patch.bio !== undefined) payload["bio"] = patch.bio;
+      if (patch.skills !== undefined) payload["skills"] = patch.skills;
+      if (patch.resumeUrl !== undefined) payload["resume_url"] = patch.resumeUrl;
+      const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
+      if (error) throw error;
+      await loadProfile(userId);
+    },
+    [userId, loadProfile],
+  );
+
+  const applyToJob = useCallback((jobId: string) => {
+    setLocal((s) => (s.applied.includes(jobId) ? s : { ...s, applied: [...s.applied, jobId] }));
+  }, []);
+
+  const setApplicantStatus = useCallback(
+    (applicantId: string, status: Applicant["status"]) => {
+      setLocal((s) => ({
+        ...s,
+        applicants: s.applicants.map((a) => (a.id === applicantId ? { ...a, status } : a)),
+      }));
+    },
     [],
   );
 
-  const toggleSaved = useCallback((jobId: string) => {
-    let nowSaved = false;
-    setState((s) => {
-      nowSaved = !s.saved.includes(jobId);
-      return {
-        ...s,
-        saved: nowSaved ? [...s.saved, jobId] : s.saved.filter((id) => id !== jobId),
-      };
-    });
-    return nowSaved;
-  }, []);
-
-  const applyToJob = useCallback((jobId: string) => {
-    setState((s) =>
-      s.applied.includes(jobId) ? s : { ...s, applied: [...s.applied, jobId] },
-    );
-  }, []);
-
-  const addCompany = useCallback((company: Omit<Company, "id">) => {
-    setState((s) => ({
-      ...s,
-      companies: [...s.companies, { ...company, id: `c${Date.now()}` }],
-    }));
-  }, []);
-
-  const addJob = useCallback((job: Omit<Job, "id" | "postedAt">) => {
-    setState((s) => ({
-      ...s,
-      jobs: [{ ...job, id: `j${Date.now()}`, postedAt: "Just now" }, ...s.jobs],
-    }));
-  }, []);
-
-  const updateJob = useCallback((jobId: string, patch: Partial<Job>) => {
-    setState((s) => ({
-      ...s,
-      jobs: s.jobs.map((job) => (job.id === jobId ? { ...job, ...patch } : job)),
-    }));
-  }, []);
-
-  const setApplicantStatus = useCallback((applicantId: string, status: Applicant["status"]) => {
-    setState((s) => ({
-      ...s,
-      applicants: s.applicants.map((a) => (a.id === applicantId ? { ...a, status } : a)),
-    }));
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
   }, []);
 
   const value = useMemo<StoreValue>(
     () => ({
-      ...state,
+      session,
+      userId,
+      user,
       hydrated,
-      login,
-      logout,
+      applied: local.applied,
+      applicants: local.applicants,
+      refreshProfile,
       updateProfile,
-      toggleSaved,
       applyToJob,
-      addCompany,
-      addJob,
-      updateJob,
       setApplicantStatus,
+      logout,
     }),
     [
-      state,
+      session,
+      userId,
+      user,
       hydrated,
-      login,
-      logout,
+      local,
+      refreshProfile,
       updateProfile,
-      toggleSaved,
       applyToJob,
-      addCompany,
-      addJob,
-      updateJob,
       setApplicantStatus,
+      logout,
     ],
   );
 
