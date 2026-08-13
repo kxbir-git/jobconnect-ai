@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/job-card";
-import { recommendJobs } from "@/lib/mock-data";
+import { recommendJobs } from "@/lib/api";
+import { useJob, useJobs, useSavedJobIds, useToggleSaved } from "@/lib/queries";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/jobs/$jobId")({
@@ -22,9 +23,15 @@ export const Route = createFileRoute("/jobs/$jobId")({
 
 function JobDetail() {
   const { jobId } = Route.useParams();
-  const { jobs, saved, applied, user, toggleSaved, applyToJob } = useStore();
-  const job = jobs.find((item) => item.id === jobId);
+  const { applied, user, applyToJob } = useStore();
+  const { data: job, isLoading } = useJob(jobId);
+  const { data: jobs = [] } = useJobs();
+  const { data: saved = [] } = useSavedJobIds();
+  const toggleSaved = useToggleSaved();
 
+  if (isLoading) {
+    return <div className="mx-auto max-w-6xl px-4 py-24 text-muted-foreground">Loading…</div>;
+  }
   if (!job) throw notFound();
 
   const isSaved = saved.includes(job.id);
@@ -99,8 +106,14 @@ function JobDetail() {
                     toast.error("Sign in to save jobs");
                     return;
                   }
-                  const nowSaved = toggleSaved(job.id);
-                  toast.success(nowSaved ? "Saved for later" : "Removed from saved");
+                  toggleSaved.mutate(
+                    { jobId: job.id, isSaved },
+                    {
+                      onSuccess: (nowSaved) =>
+                        toast.success(nowSaved ? "Saved for later" : "Removed from saved"),
+                      onError: () => toast.error("Could not update saved jobs"),
+                    },
+                  );
                 }}
               >
                 {isSaved ? <BookmarkCheck className="size-4" /> : <Bookmark className="size-4" />}

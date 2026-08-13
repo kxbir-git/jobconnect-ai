@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { useStore, type Role } from "@/lib/store";
+import { supabase } from "@/integrations/supabase/client";
+import { type Role } from "@/lib/store";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -25,15 +26,15 @@ type Step = "form" | "otp";
 
 function AuthPage() {
   const navigate = useNavigate();
-  const { login } = useStore();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [step, setStep] = useState<Step>("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("student");
   const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const sendCode = () => {
+  const sendCode = async () => {
     if (!email.includes("@")) {
       toast.error("Enter a valid email address");
       return;
@@ -42,25 +43,37 @@ function AuthPage() {
       toast.error("Enter your name");
       return;
     }
+    setBusy(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: mode === "signup",
+        data: { name: name.trim() || email.split("@")[0]!, role },
+      },
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     setStep("otp");
-    toast.success(`Verification code sent to ${email}`, { description: "Demo code: 123456" });
+    toast.success(`Verification code sent to ${email}`);
   };
 
-  const verify = () => {
+  const verify = async () => {
     if (code.length !== 6) {
       toast.error("Enter the 6-digit code");
       return;
     }
-    login({
-      name: name.trim() || email.split("@")[0]!,
-      email,
-      role,
-      bio: "",
-      skills: [],
-      resumeUrl: "",
-    });
+    setBusy(true);
+    const { error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("You're signed in");
-    navigate({ to: role === "recruiter" ? "/recruiter" : "/profile" });
+    void navigate({ to: role === "recruiter" ? "/recruiter" : "/profile" });
   };
 
   return (
@@ -124,7 +137,7 @@ function AuthPage() {
                     </div>
                   </div>
 
-                  <Button className="w-full" onClick={sendCode}>
+                  <Button className="w-full" disabled={busy} onClick={() => void sendCode()}>
                     Send verification code
                   </Button>
                 </div>
@@ -140,7 +153,7 @@ function AuthPage() {
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
-                <Button className="w-full" onClick={verify}>
+                <Button className="w-full" disabled={busy} onClick={() => void verify()}>
                   Verify and continue
                 </Button>
                 <div className="flex justify-between text-sm">
@@ -150,10 +163,7 @@ function AuthPage() {
                   >
                     Change email
                   </button>
-                  <button
-                    className="text-primary-glow hover:underline"
-                    onClick={() => toast.success("New code sent", { description: "Demo code: 123456" })}
-                  >
+                  <button className="text-primary-glow hover:underline" onClick={() => void sendCode()}>
                     Resend code
                   </button>
                 </div>

@@ -110,12 +110,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(
     async (patch: Partial<Profile>) => {
       if (!userId) return;
-      const payload: Record<string, unknown> = {};
-      if (patch.name !== undefined) payload["name"] = patch.name;
-      if (patch.role !== undefined) payload["role"] = patch.role;
-      if (patch.bio !== undefined) payload["bio"] = patch.bio;
-      if (patch.skills !== undefined) payload["skills"] = patch.skills;
-      if (patch.resumeUrl !== undefined) payload["resume_url"] = patch.resumeUrl;
+      const payload: {
+        name?: string;
+        role?: string;
+        bio?: string;
+        skills?: string[];
+        resume_url?: string;
+      } = {};
+      if (patch.name !== undefined) payload.name = patch.name;
+      if (patch.role !== undefined) payload.role = patch.role;
+      if (patch.bio !== undefined) payload.bio = patch.bio;
+      if (patch.skills !== undefined) payload.skills = patch.skills;
+      if (patch.resumeUrl !== undefined) payload.resume_url = patch.resumeUrl;
       const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
       if (error) throw error;
       await loadProfile(userId);

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useStore } from "@/lib/store";
+import { useJobs } from "@/lib/queries";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -23,7 +24,8 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
-  const { user, jobs, applied, updateProfile } = useStore();
+  const { user, applied, updateProfile } = useStore();
+  const { data: jobs = [] } = useJobs();
 
   if (!user) {
     return (
