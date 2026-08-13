@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createCompany,
+  createJob,
   fetchCompanies,
   fetchJob,
   fetchJobs,
@@ -7,6 +9,8 @@ import {
   saveJob,
   unsaveJob,
   type Job,
+  type NewCompany,
+  type NewJob,
 } from "./api";
 import { useStore } from "./store";
 
@@ -44,6 +48,34 @@ export function useToggleSaved() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["saved", userId] });
+    },
+  });
+}
+
+export function useCreateCompany() {
+  const { userId } = useStore();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (company: NewCompany) => {
+      if (!userId) throw new Error("Not signed in");
+      return createCompany(userId, company);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["companies"] });
+    },
+  });
+}
+
+export function useCreateJob() {
+  const { userId } = useStore();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (job: NewJob) => {
+      if (!userId) throw new Error("Not signed in");
+      return createJob(userId, job);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 }
