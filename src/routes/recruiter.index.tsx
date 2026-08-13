@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useStore } from "@/lib/store";
+import { useCompanies, useCreateCompany, useCreateJob, useJobs } from "@/lib/queries";
 
 export const Route = createFileRoute("/recruiter/")({
   head: () => ({
@@ -23,7 +23,11 @@ export const Route = createFileRoute("/recruiter/")({
 });
 
 function RecruiterDashboard() {
-  const { companies, jobs, applicants, addCompany, addJob } = useStore();
+  const { data: companies = [] } = useCompanies();
+  const { data: jobs = [] } = useJobs();
+  const { applicants } = useStore();
+  const addCompany = useCreateCompany();
+  const addJob = useCreateJob();
 
   const [companyName, setCompanyName] = useState("");
   const [companyWebsite, setCompanyWebsite] = useState("");
@@ -135,17 +139,24 @@ function RecruiterDashboard() {
                     toast.error("Company name is required");
                     return;
                   }
-                  addCompany({
-                    name: companyName,
-                    website: companyWebsite,
-                    location: companyLocation,
-                    about: companyAbout,
-                  });
-                  setCompanyName("");
-                  setCompanyWebsite("");
-                  setCompanyLocation("");
-                  setCompanyAbout("");
-                  toast.success("Company created");
+                  addCompany.mutate(
+                    {
+                      name: companyName,
+                      website: companyWebsite,
+                      location: companyLocation,
+                      about: companyAbout,
+                    },
+                    {
+                      onSuccess: () => {
+                        setCompanyName("");
+                        setCompanyWebsite("");
+                        setCompanyLocation("");
+                        setCompanyAbout("");
+                        toast.success("Company created");
+                      },
+                      onError: (error) => toast.error(error.message),
+                    },
+                  );
                 }}
               >
                 Create company
@@ -224,27 +235,34 @@ function RecruiterDashboard() {
                       toast.error("Title and company are required");
                       return;
                     }
-                    addJob({
-                      title: jobTitle,
-                      company: company.name,
-                      companyId: company.id,
-                      location: jobLocation || company.location,
-                      jobType: "Full-time",
-                      salary: jobSalary || "Not disclosed",
-                      experience: "2–4 years",
-                      description: jobDescription,
-                      requirements: [],
-                      tags: jobTags
-                        .split(",")
-                        .map((tag) => tag.trim())
-                        .filter(Boolean),
-                    });
-                    setJobTitle("");
-                    setJobLocation("");
-                    setJobSalary("");
-                    setJobDescription("");
-                    setJobTags("");
-                    toast.success("Job published");
+                    addJob.mutate(
+                      {
+                        title: jobTitle,
+                        companyName: company.name,
+                        companyId: company.id,
+                        location: jobLocation || company.location,
+                        jobType: "Full-time",
+                        salary: jobSalary || "Not disclosed",
+                        experience: "2–4 years",
+                        description: jobDescription,
+                        requirements: [],
+                        tags: jobTags
+                          .split(",")
+                          .map((tag) => tag.trim())
+                          .filter(Boolean),
+                      },
+                      {
+                        onSuccess: () => {
+                          setJobTitle("");
+                          setJobLocation("");
+                          setJobSalary("");
+                          setJobDescription("");
+                          setJobTags("");
+                          toast.success("Job published");
+                        },
+                        onError: (error) => toast.error(error.message),
+                      },
+                    );
                   }}
                 >
                   Publish job
