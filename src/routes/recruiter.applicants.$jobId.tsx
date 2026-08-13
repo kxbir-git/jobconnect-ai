@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
+import { useJob } from "@/lib/queries";
 
 export const Route = createFileRoute("/recruiter/applicants/$jobId")({
   head: () => ({
@@ -19,8 +20,12 @@ export const Route = createFileRoute("/recruiter/applicants/$jobId")({
 
 function ApplicantsPage() {
   const { jobId } = Route.useParams();
-  const { jobs, applicants, setApplicantStatus } = useStore();
-  const job = jobs.find((item) => item.id === jobId);
+  const { applicants, setApplicantStatus } = useStore();
+  const { data: job, isLoading } = useJob(jobId);
+
+  if (isLoading) {
+    return <div className="mx-auto max-w-4xl px-4 py-24 text-muted-foreground">Loading…</div>;
+  }
   if (!job) throw notFound();
 
   const list = applicants.filter((applicant) => applicant.jobId === jobId);
