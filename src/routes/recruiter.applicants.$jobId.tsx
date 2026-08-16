@@ -1,10 +1,13 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/store";
+import { assignApplicantsToJobs } from "@/lib/mock-data";
 import { useJob } from "@/lib/queries";
+import { useJobs } from "@/lib/queries";
 
 export const Route = createFileRoute("/recruiter/applicants/$jobId")({
   head: () => ({
@@ -20,8 +23,13 @@ export const Route = createFileRoute("/recruiter/applicants/$jobId")({
 
 function ApplicantsPage() {
   const { jobId } = Route.useParams();
-  const { applicants, setApplicantStatus } = useStore();
+  const { applicants: rawApplicants, setApplicantStatus } = useStore();
   const { data: job, isLoading } = useJob(jobId);
+  const { data: jobs = [] } = useJobs();
+  const applicants = useMemo(
+    () => assignApplicantsToJobs(rawApplicants, jobs.map((item) => item.id)),
+    [rawApplicants, jobs],
+  );
 
   if (isLoading) {
     return <div className="mx-auto max-w-4xl px-4 py-24 text-muted-foreground">Loading…</div>;
@@ -80,6 +88,16 @@ function ApplicantsPage() {
                 }}
               >
                 Shortlist
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setApplicantStatus(applicant.id, "Hired");
+                  toast.success(`${applicant.name} hired`);
+                }}
+              >
+                Hire
               </Button>
               <Button
                 size="sm"

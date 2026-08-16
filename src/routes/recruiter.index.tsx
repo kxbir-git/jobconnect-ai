@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompanies, useCreateCompany, useCreateJob, useJobs } from "@/lib/queries";
 import { useStore } from "@/lib/store";
+import { assignApplicantsToJobs } from "@/lib/mock-data";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/recruiter/")({
   head: () => ({
@@ -26,7 +28,22 @@ export const Route = createFileRoute("/recruiter/")({
 function RecruiterDashboard() {
   const { data: companies = [] } = useCompanies();
   const { data: jobs = [] } = useJobs();
-  const { applicants } = useStore();
+  const { applicants: rawApplicants } = useStore();
+  const applicants = useMemo(
+    () => assignApplicantsToJobs(rawApplicants, jobs.map((job) => job.id)),
+    [rawApplicants, jobs],
+  );
+
+  const decided = applicants.filter((a) => a.status === "Hired" || a.status === "Rejected");
+  const hired = applicants.filter((a) => a.status === "Hired");
+  const acceptanceRate = decided.length
+    ? Math.round((hired.length / decided.length) * 100)
+    : 0;
+  const timeToHire = hired.length
+    ? Math.round(hired.reduce((sum, a) => sum + a.daysToDecision, 0) / hired.length)
+    : 0;
+  const fastestHire = hired.length ? Math.min(...hired.map((a) => a.daysToDecision)) : 0;
+
   const addCompany = useCreateCompany();
   const addJob = useCreateJob();
 
@@ -51,10 +68,81 @@ function RecruiterDashboard() {
 
       <Tabs defaultValue="jobs" className="mt-8">
         <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="jobs">Jobs</TabsTrigger>
           <TabsTrigger value="companies">Companies</TabsTrigger>
           <TabsTrigger value="post">Post a job</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview" className="mt-6 space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: "Total applicants", value: `${applicants.length}`, hint: `${jobs.length} open roles` },
+              { label: "Acceptance rate", value: `${acceptanceRate}%`, hint: `${hired.length} of ${decided.length} decided` },
+              { label: "Avg time-to-hire", value: `${timeToHire} days`, hint: `Fastest ${fastestHire} days` },
+              { label: "In pipeline", value: `${applicants.length - decided.length}`, hint: "Awaiting a decision" },
+            ].map((metric) => (
+              <Card key={metric.label} className="border-border/70">
+                <CardContent className="p-5">
+                  <p className="text-sm text-muted-foreground">{metric.label}</p>
+                  <p className="mt-2 text-3xl font-semibold">{metric.value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{metric.hint}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="border-border/70">
+            <CardHeader>
+              <CardTitle>Applicants per job</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {jobs.length === 0 && (
+                <p className="text-sm text-muted-foreground">Post a job to start tracking metrics.</p>
+              )}
+              {jobs.map((job) => {
+                const list = applicants.filter((a) => a.jobId === job.id);
+                const jobHired = list.filter((a) => a.status === "Hired");
+                const jobDecided = list.filter(
+                  (a) => a.status === "Hired" || a.status === "Rejected",
+                );
+                const rate = jobDecided.length
+                  ? Math.round((jobHired.length / jobDecided.length) * 100)
+                  : 0;
+                const ttl = jobHired.length
+                  ? Math.round(
+                      jobHired.reduce((sum, a) => sum + a.daysToDecision, 0) / jobHired.length,
+                    )
+                  : null;
+                const share = applicants.length
+                  ? Math.round((list.length / applicants.length) * 100)
+                  : 0;
+                return (
+                  <div key={job.id} className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium">{job.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {job.company} · {job.location}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="secondary">{list.length} applicants</Badge>
+                        <Badge variant="outline">{rate}% accepted</Badge>
+                        <Badge variant="outline">
+                          {ttl === null ? "No hires yet" : `${ttl}d to hire`}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${share}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="jobs" className="mt-6 space-y-3">
           {jobs.map((job) => {

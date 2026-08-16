@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { supabase } from "@/integrations/supabase/client";
 import { useStore } from "@/lib/store";
 import { useJobs } from "@/lib/queries";
 
@@ -147,9 +147,8 @@ function ProfilePage() {
 }
 
 function PasswordCard() {
-  const [sent, setSent] = useState(false);
-  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
 
   return (
     <Card className="border-border/70">
@@ -157,55 +156,36 @@ function PasswordCard() {
         <CardTitle>Change password</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!sent ? (
-          <>
-            <p className="text-sm text-muted-foreground">
-              We&apos;ll email you a 6-digit code to confirm it&apos;s you.
-            </p>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setSent(true);
-                toast.success("Code sent", { description: "Demo code: 123456" });
-              }}
-            >
-              Send code
-            </Button>
-          </>
-        ) : (
-          <>
-            <InputOTP maxLength={6} value={code} onChange={setCode}>
-              <InputOTPGroup>
-                {[0, 1, 2, 3, 4, 5].map((index) => (
-                  <InputOTPSlot key={index} index={index} />
-                ))}
-              </InputOTPGroup>
-            </InputOTP>
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </div>
-            <Button
-              onClick={() => {
-                if (code.length !== 6 || password.length < 6) {
-                  toast.error("Enter the code and a password of 6+ characters");
-                  return;
-                }
-                setSent(false);
-                setCode("");
-                setPassword("");
-                toast.success("Password updated");
-              }}
-            >
-              Update password
-            </Button>
-          </>
-        )}
+        <div className="space-y-2">
+          <Label htmlFor="new-password">New password</Label>
+          <Input
+            id="new-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </div>
+        <Button
+          disabled={busy}
+          onClick={() => {
+            if (password.length < 6) {
+              toast.error("Use a password of 6+ characters");
+              return;
+            }
+            setBusy(true);
+            void supabase.auth.updateUser({ password }).then(({ error }) => {
+              setBusy(false);
+              if (error) {
+                toast.error(error.message);
+                return;
+              }
+              setPassword("");
+              toast.success("Password updated");
+            });
+          }}
+        >
+          Update password
+        </Button>
       </CardContent>
     </Card>
   );
